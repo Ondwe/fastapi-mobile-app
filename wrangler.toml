@@ -1,14 +1,7 @@
 name = "fastapi-mobile-app"
+type = "python"
 main = "worker.py"
-compatibility_date = "2024-11-05"
-compatibility_flags = ["nodejs_compat", "python_workers"]
-
-[env.production]
-zone_id = "your-zone-id"
-account_id = "your-account-id"
+compatibility_date = "2024-11-06"
 
 [vars]
 ENVIRONMENT = "production"
-
-# Remove [assets] section - we're building an API, not static site
-# Remove [build] section - Cloudflare Pages handles this separately
