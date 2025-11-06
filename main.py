@@ -1,7 +1,6 @@
 from http.server import HTTPServer, BaseHTTPRequestHandler
 import json
 import urllib.parse as urlparse
-from database import HumbuDatabase
 from payment_handlers import PaymentAPI
 from admin import HumbuAdmin
 from crm import HumbuCRM
