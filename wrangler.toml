@@ -2,6 +2,7 @@ name = "fastapi-mobile-app"
 type = "python"
 main = "worker.py"
 compatibility_date = "2024-11-06"
+compatibility_flags = ["python_workers"]
 
 [env.production]
 zone_id = "16b85e1c695921a4d56305e4a94438e8"
