@@ -1,6 +1,7 @@
 from fastapi import FastAPI
-from main import app
 import asyncio
+from main import app
 
-async def fetch(request):
-    return await app(request)
+# Cloudflare Workers expect this exact function signature
+async def on_fetch(request, env, ctx):
+    return await app(request.scope, request.receive, request.waitUntil)
