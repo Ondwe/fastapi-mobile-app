@@ -9,4 +9,3 @@
 # - Git (build-your-own-git)
 
 # This platform leverages your deep system understanding!
-cloudflare-workers
