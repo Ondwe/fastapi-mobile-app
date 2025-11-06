@@ -16,3 +16,4 @@ AI-powered agent container for handling intelligent automation, data processing,
 - API Integrations
 
 ## Setup
+# Deployment trigger: Force new Cloudflare build with python_workers fix
