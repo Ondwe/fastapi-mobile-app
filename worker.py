@@ -1,15 +1,7 @@
-from fastapi import FastAPI
+from workers import WorkerEntrypoint
 from main import app as fastapi_app
+import asgi
 
-# Cloudflare Workers Python adapter
-try:
-    from cloudflare_workers import HttpService
-    http_service = HttpService(fastapi_app)
-    
-    async def fetch(request):
-        return await http_service.handle_request(request)
-        
-except ImportError:
-    # Fallback for local development
-    async def fetch(request):
-        return Response("Cloudflare Workers Python adapter not available", status=500)
+class Default(WorkerEntrypoint):
+    async def fetch(self, request):
+        return await asgi.fetch(fastapi_app, request, self.env)
