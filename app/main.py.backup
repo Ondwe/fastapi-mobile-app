@@ -1,0 +1,12 @@
+
+@app.get("/health")
+async def health_check():
+    return {"status": "healthy", "message": "FastAPI mobile app is running"}
+
+@app.get("/test-auth")
+async def test_auth_page():
+    return templates.TemplateResponse("test_auth.html", {"request": Request})
+
+@app.get("/")
+async def home_page():
+    return templates.TemplateResponse("home_fixed.html", {"request": Request})
