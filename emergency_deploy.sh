@@ -1,3 +1,16 @@
+#!/bin/bash
+
+echo "🚨 EMERGENCY DEPLOYMENT - CLEAN SLATE"
+echo "====================================="
+
+# Remove ALL potential conflicting files
+echo "🧹 REMOVING ALL CONFLICTING FILES..."
+find . -name "*.py" -not -name "main.py" -not -name "deploy*.sh" -not -name "monitor*.sh" -not -path "./venv/*" -delete 2>/dev/null
+echo "✅ Removed all conflicting Python files"
+
+# Create a CLEAN main.py
+echo "📁 CREATING CLEAN BUSINESS API..."
+cat > main.py << 'MAIN_EOF'
 from fastapi import FastAPI
 from datetime import datetime
 import random
@@ -72,3 +85,39 @@ async def analytics():
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
+MAIN_EOF
+
+# Update Dockerfile to be explicit
+cat > Dockerfile << 'DOCKERFILE_EOF'
+FROM python:3.9-slim
+
+WORKDIR /app
+
+# Copy requirements first for better caching
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy ONLY necessary files
+COPY main.py .
+COPY requirements.txt .
+
+EXPOSE 8000
+
+# Explicit command - no ambiguity
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+DOCKERFILE_EOF
+
+echo "✅ Clean main.py and Dockerfile created"
+
+# Show final file structure
+echo ""
+echo "📁 FINAL FILE STRUCTURE:"
+ls -la
+
+echo ""
+echo "🚀 DEPLOYING CLEAN VERSION..."
+git add -A
+git commit -m "🚨 EMERGENCY FIX: Remove conflicting files, clean Business API deployment"
+git push origin master
+
+echo "✅ CLEAN DEPLOYMENT INITIATED!"
