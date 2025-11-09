@@ -1,3 +1,34 @@
+#!/bin/bash
+
+echo "🚀 BUSINESS API DEPLOYMENT OVERRIDE"
+echo "==================================="
+
+# Step 1: Update Dockerfile to use Business API
+echo "📝 UPDATING DOCKERFILE..."
+cat > Dockerfile << 'DOCKERFILE_EOF'
+FROM python:3.9-slim
+
+WORKDIR /app
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY . .
+
+EXPOSE 8000
+
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+DOCKERFILE_EOF
+echo "✅ Dockerfile updated to use main:app"
+
+# Step 2: Remove conflicting web app files
+echo "🧹 CLEANING CONFLICTING FILES..."
+rm -rf static/ templates/ 2>/dev/null && echo "✅ Removed static/ and templates/"
+rm -f *.html manifest.json 2>/dev/null && echo "✅ Removed HTML and PWA files"
+
+# Step 3: Create Business API main.py
+echo "📁 CREATING BUSINESS API..."
+cat > main.py << 'MAIN_EOF'
 from fastapi import FastAPI
 from datetime import datetime
 import random
@@ -71,3 +102,23 @@ async def analytics():
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
+MAIN_EOF
+echo "✅ Created main.py with Business API v7.0.0"
+
+# Step 4: Update requirements
+echo "📦 UPDATING REQUIREMENTS..."
+cat > requirements.txt << 'REQS_EOF'
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+REQS_EOF
+echo "✅ Updated requirements.txt"
+
+# Step 5: Git operations
+echo "🔧 CONFIGURING DEPLOYMENT..."
+git add -A
+git commit -m "🚀 BUSINESS API OVERRIDE: Deploy Connected Business API v7.0.0 - Replaces web app with FastAPI business endpoints"
+
+echo ""
+echo "✅ READY FOR DEPLOYMENT!"
+echo "🚀 Run: git push origin master"
+echo "📊 Monitor: https://fastapi-mobile-app.onrender.com"
