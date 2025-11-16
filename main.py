@@ -91,7 +91,7 @@ async def customers():
         "retention_rate": "92%"
     }
 
-@app.post("/ai/chat")
+@app.post("/**api/ai/chat**")
 async def ai_chat_proxy(message_data: dict):
     """Smart AI proxy - tries external AI first, falls back to built-in"""
     user_message = message_data.get("message", "")
