@@ -68,7 +68,7 @@ async def get_extended_business_intelligence():
         }
     }
 
-@app.get("/health")
+@app.api_route("/health", methods=["GET", "HEAD"])
 async def health():
     return {
         "status": "healthy", 
