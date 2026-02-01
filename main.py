@@ -28,7 +28,7 @@ def get_current_username(credentials: HTTPBasicCredentials = Depends(security)):
     Only permits access to authorized Imperial personnel
     """
     correct_username = secrets.compare_digest(credentials.username, "humbulani")
-    correct_password = secrets.compare_digest(credentials.password, "'"$SECURE_PASSWORD"'")
+    correct_password = secrets.compare_digest(credentials.password, os.getenv("SECURE_PASSWORD", "default_pass"))
     
     if not (correct_username and correct_password):
         logger.warning(f"Unauthorized access attempt: {credentials.username}")
@@ -222,7 +222,7 @@ async def ceo_info():
         "title": "CEO, Humbu Imperial Nexus",
         "contact": "079 465 8481",
         "response_time": "<2 hours",
-        "portfolio_responsibility": "R10,110,466.32",
+        "portfolio_responsibility": "R10,235,466.32",
         "council_oversight": 352,
         "access_level": "imperial_full"
     }
@@ -270,7 +270,7 @@ async def startup_event():
     logger.info("🏛️ HUMBU IMPERIAL BUSINESS BRAIN - SECURE MODE")
     logger.info("🔒 Imperial Gatekeeper: ACTIVE")
     logger.info("👑 Authorized CEO: Humbulani Mudau")
-    logger.info("💰 Portfolio: R10,110,466.32")
+    logger.info("💰 Portfolio: R10,235,466.32")
     logger.info("🏛️ System: 17-port Imperial Stack (Secured)")
     logger.info("🌐 GitHub: github.com/Ondwe/fastapi-mobile-app")
     logger.info("🛡️ Dashboard: Protected with Basic Authentication")
