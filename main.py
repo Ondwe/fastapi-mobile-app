@@ -1,32 +1,58 @@
 """
 🏛️ FastAPI Mobile App - Business Brain
 CEO: Humbulani Mudau | Imperial Intelligence Core
+SECURE VERSION: Imperial Gatekeeper Enabled
 """
 
-from fastapi import FastAPI, HTTPException, Depends
+from fastapi import FastAPI, HTTPException, Depends, status
+from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse, FileResponse
 from datetime import datetime
 import logging
+import secrets
 from typing import Dict, Any
+import os
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# Imperial Gatekeeper - Basic Authentication
+security = HTTPBasic()
+
+def get_current_username(credentials: HTTPBasicCredentials = Depends(security)):
+    """
+    Imperial Gatekeeper - Validates CEO credentials
+    Only permits access to authorized Imperial personnel
+    """
+    correct_username = secrets.compare_digest(credentials.username, "humbulani")
+    correct_password = secrets.compare_digest(credentials.password, os.getenv("SECURE_PASSWORD", "default_pass"))
+    
+    if not (correct_username and correct_password):
+        logger.warning(f"Unauthorized access attempt: {credentials.username}")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Imperial Access Denied: Invalid credentials",
+            headers={"WWW-Authenticate": "Basic realm='Imperial Nexus'"},
+        )
+    
+    logger.info(f"Authorized Imperial access: {credentials.username}")
+    return credentials.username
+
 # Create FastAPI app
 app = FastAPI(
-    title="Humbu Imperial Business Brain",
-    description="Central intelligence core for the 17-port Imperial System",
-    version="2.0.0",
+    title="Humbu Imperial Business Brain - SECURE",
+    description="Protected central intelligence core for the 17-port Imperial System",
+    version="2.1.0",
     contact={
         "name": "Humbulani Mudau",
         "email": "humbulani@imperial.nexus",
         "url": "https://fastapi-mobile-app.onrender.com"
     },
     license_info={
-        "name": "Imperial License",
+        "name": "Imperial License - Confidential",
         "url": "https://github.com/Ondwe/fastapi-mobile-app"
     }
 )
@@ -43,11 +69,11 @@ app.add_middleware(
 # Mount static files - Imperial Intelligence Dashboard
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
-# Root endpoint - Returns the Imperial Intelligence Dashboard
-@app.get("/", response_class=HTMLResponse)
+# Root endpoint - PROTECTED Imperial Intelligence Dashboard
+@app.get("/", response_class=HTMLResponse, dependencies=[Depends(get_current_username)])
 async def read_root():
     """
-    Imperial Intelligence Dashboard - Primary interface
+    Imperial Intelligence Dashboard - Protected CEO Access Only
     """
     try:
         with open("public/index.html", "r") as f:
@@ -57,52 +83,52 @@ async def read_root():
         return HTMLResponse("""
         <!DOCTYPE html>
         <html>
-        <head><title>Humbu Imperial Business Brain</title></head>
+        <head><title>Humbu Imperial Business Brain - SECURE</title></head>
         <body style="background: #0d1117; color: white; font-family: monospace; padding: 40px;">
             <h1>🏛️ HUMBU IMPERIAL BUSINESS BRAIN</h1>
             <p>CEO: Humbulani Mudau | System: 17-port Imperial Stack</p>
-            <p>🚀 Dashboard is loading...</p>
+            <p>🔒 Dashboard is secured with Imperial Gatekeeper</p>
+            <p>🚀 Authentication successful. Loading dashboard...</p>
         </body>
         </html>
         """)
 
-# Health check endpoint
+# Public health check endpoint (No authentication required)
 @app.get("/health")
 async def health_check() -> Dict[str, Any]:
     """
-    Business Brain health check
-    Returns system status and component health
+    Public Business Brain health check
+    Returns system status without sensitive data
     """
     health_status = {
         "status": "healthy",
-        "audit_ready": True,
+        "secured": True,
+        "gatekeeper": "active",
         "timestamp": datetime.utcnow().isoformat(),
         "checks": {
             "api": "operational",
-            "database": "connected",
-            "ai_models": "loaded",
-            "monitoring": "active",
+            "authentication": "enabled",
             "imperial_integration": "17/17 ports",
             "github_sync": "active",
             "render_deployment": "live"
         },
         "system": {
             "name": "Humbu Imperial Business Brain",
-            "version": "2.0.0",
-            "ceo": "Humbulani Mudau",
-            "contact": "079 465 8481",
-            "portfolio": "R10,110,466.32",
+            "version": "2.1.0",
+            "status": "secured",
             "uptime": "100.0%"
-        }
+        },
+        "note": "Imperial Dashboard requires CEO authentication"
     }
-    logger.info(f"Health check requested at {health_status['timestamp']}")
+    logger.info(f"Public health check requested at {health_status['timestamp']}")
     return health_status
 
-# Imperial System Status
-@app.get("/api/imperial/status")
+# Imperial System Status (Protected)
+@app.get("/api/imperial/status", dependencies=[Depends(get_current_username)])
 async def imperial_status():
     """
     Returns status of the 17-port Imperial System
+    PROTECTED ENDPOINT - CEO Access Only
     """
     status = {
         "timestamp": datetime.utcnow().isoformat(),
@@ -111,6 +137,7 @@ async def imperial_status():
         "total_ports": 17,
         "online_ports": 17,
         "status": "fully_operational",
+        "security_level": "gatekeeper_active",
         "ports": [
             {"port": 8000, "service": "Business API (Render)", "status": "online"},
             {"port": 8082, "service": "Imperial Dashboard (UI)", "status": "online"},
@@ -146,11 +173,12 @@ async def imperial_status():
     }
     return status
 
-# Market Intelligence Summary
-@app.get("/api/market/intelligence")
+# Market Intelligence Summary (Protected)
+@app.get("/api/market/intelligence", dependencies=[Depends(get_current_username)])
 async def market_intelligence():
     """
     Market intelligence data from Port 8103
+    PROTECTED ENDPOINT - CEO Access Only
     """
     return {
         "timestamp": datetime.utcnow().isoformat(),
@@ -165,11 +193,12 @@ async def market_intelligence():
         ]
     }
 
-# GitHub deployment info
-@app.get("/api/deployment/info")
+# GitHub deployment info (Protected)
+@app.get("/api/deployment/info", dependencies=[Depends(get_current_username)])
 async def deployment_info():
     """
     GitHub → Render deployment information
+    PROTECTED ENDPOINT - CEO Access Only
     """
     return {
         "repository": "github.com/Ondwe/fastapi-mobile-app",
@@ -178,37 +207,57 @@ async def deployment_info():
         "platform": "Render",
         "url": "https://fastapi-mobile-app.onrender.com",
         "health_endpoint": "GET /health",
-        "dashboard": "GET /"
+        "dashboard": "GET / (CEO Auth Required)"
     }
 
-# CEO Contact Information
-@app.get("/api/ceo/info")
+# CEO Contact Information (Protected)
+@app.get("/api/ceo/info", dependencies=[Depends(get_current_username)])
 async def ceo_info():
     """
     CEO contact information
+    PROTECTED ENDPOINT - CEO Access Only
     """
     return {
         "name": "Humbulani Mudau",
         "title": "CEO, Humbu Imperial Nexus",
         "contact": "079 465 8481",
         "response_time": "<2 hours",
-        "portfolio_responsibility": "R10,110,466.32",
-        "council_oversight": 352
+        "portfolio_responsibility": "R10,235,466.32",
+        "council_oversight": 352,
+        "access_level": "imperial_full"
     }
 
-# Error handler
-@app.exception_handler(404)
-async def not_found(request, exc):
+# Error handler for 401
+@app.exception_handler(401)
+async def unauthorized_handler(request, exc):
     """
-    Custom 404 handler that redirects to Imperial Dashboard
+    Custom 401 handler for Imperial Gatekeeper
+    """
+    return JSONResponse(
+        status_code=401,
+        content={
+            "message": "Imperial Access Denied",
+            "detail": "Valid CEO credentials required",
+            "realm": "Imperial Nexus",
+            "contact": "CEO: Humbulani Mudau",
+            "authentication": "Basic auth required"
+        },
+        headers={"WWW-Authenticate": "Basic realm='Imperial Nexus'"}
+    )
+
+# Error handler for 404
+@app.exception_handler(404)
+async def not_found_handler(request, exc):
+    """
+    Custom 404 handler that respects authentication
     """
     return JSONResponse(
         status_code=404,
         content={
             "message": "Imperial resource not found",
             "redirect": "/",
-            "dashboard": "https://fastapi-mobile-app.onrender.com",
-            "documentation": "https://fastapi-mobile-app.onrender.com/docs"
+            "authentication": "CEO credentials required for dashboard",
+            "public_endpoint": "GET /health"
         }
     )
 
@@ -216,14 +265,15 @@ async def not_found(request, exc):
 @app.on_event("startup")
 async def startup_event():
     """
-    Business Brain startup sequence
+    Business Brain startup sequence with Gatekeeper
     """
-    logger.info("🏛️ HUMBU IMPERIAL BUSINESS BRAIN STARTING")
-    logger.info("CEO: Humbulani Mudau")
-    logger.info("Portfolio: R10,110,466.32")
-    logger.info("System: 17-port Imperial Stack")
-    logger.info("GitHub: github.com/Ondwe/fastapi-mobile-app")
-    logger.info("Dashboard: https://fastapi-mobile-app.onrender.com")
+    logger.info("🏛️ HUMBU IMPERIAL BUSINESS BRAIN - SECURE MODE")
+    logger.info("🔒 Imperial Gatekeeper: ACTIVE")
+    logger.info("👑 Authorized CEO: Humbulani Mudau")
+    logger.info("💰 Portfolio: R10,235,466.32")
+    logger.info("🏛️ System: 17-port Imperial Stack (Secured)")
+    logger.info("🌐 GitHub: github.com/Ondwe/fastapi-mobile-app")
+    logger.info("🛡️ Dashboard: Protected with Basic Authentication")
 
 # Application shutdown event
 @app.on_event("shutdown")
@@ -231,7 +281,7 @@ async def shutdown_event():
     """
     Business Brain shutdown sequence
     """
-    logger.info("Business Brain shutting down gracefully")
+    logger.info("🔒 Imperial Gatekeeper shutting down gracefully")
 
 if __name__ == "__main__":
     import uvicorn
