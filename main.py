@@ -28,7 +28,7 @@ def get_current_username(credentials: HTTPBasicCredentials = Depends(security)):
     Only permits access to authorized Imperial personnel
     """
     correct_username = secrets.compare_digest(credentials.username, "humbulani")
-    correct_password = secrets.compare_digest(credentials.password, os.getenv("SECURE_PASSWORD", "default_pass"))
+    correct_password = secrets.compare_digest(credentials.password, "HM.201499")
     
     if not (correct_username and correct_password):
         logger.warning(f"Unauthorized access attempt: {credentials.username}")
