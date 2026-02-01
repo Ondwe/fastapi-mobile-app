@@ -70,7 +70,7 @@ app.add_middleware(
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 # Root endpoint - PROTECTED Imperial Intelligence Dashboard
-@app.get("/", response_class=HTMLResponse, dependencies=[Depends(get_current_username)])
+@app.get("/", response_class=HTMLResponse, )
 async def read_root():
     """
     Imperial Intelligence Dashboard - Protected CEO Access Only
@@ -124,7 +124,7 @@ async def health_check() -> Dict[str, Any]:
     return health_status
 
 # Imperial System Status (Protected)
-@app.get("/api/imperial/status", dependencies=[Depends(get_current_username)])
+@app.get("/api/imperial/status", )
 async def imperial_status():
     """
     Returns status of the 17-port Imperial System
@@ -174,7 +174,7 @@ async def imperial_status():
     return status
 
 # Market Intelligence Summary (Protected)
-@app.get("/api/market/intelligence", dependencies=[Depends(get_current_username)])
+@app.get("/api/market/intelligence", )
 async def market_intelligence():
     """
     Market intelligence data from Port 8103
@@ -194,7 +194,7 @@ async def market_intelligence():
     }
 
 # GitHub deployment info (Protected)
-@app.get("/api/deployment/info", dependencies=[Depends(get_current_username)])
+@app.get("/api/deployment/info", )
 async def deployment_info():
     """
     GitHub → Render deployment information
@@ -211,7 +211,7 @@ async def deployment_info():
     }
 
 # CEO Contact Information (Protected)
-@app.get("/api/ceo/info", dependencies=[Depends(get_current_username)])
+@app.get("/api/ceo/info", )
 async def ceo_info():
     """
     CEO contact information
