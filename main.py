@@ -1,265 +1,1023 @@
-from fastapi import FastAPI, HTTPException, Depends, status
-from fastapi.security import HTTPBasic, HTTPBasicCredentials
-from fastapi.staticfiles import StaticFiles
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse, JSONResponse, FileResponse
-import httpx
-import secrets
 import os
-from datetime import datetime
-from typing import Dict, Any
-import logging
+import mysql.connector
 
-# Configure logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+def get_db_connection():
 
-# Imperial Gatekeeper - Optional for AI chat
-security = HTTPBasic(auto_error=False)
+    return mysql.connector.connect(
 
-def optional_auth(credentials: HTTPBasicCredentials = Depends(security)):
-    """Optional authentication - allows public access to AI chat"""
-    if credentials:
-        correct_username = secrets.compare_digest(credentials.username, "humbulani")
-        correct_password = secrets.compare_digest(credentials.password, os.getenv("SECURE_PASSWORD", "imperial2026"))
-        if correct_username and correct_password:
-            logger.info(f"Admin access granted: {credentials.username}")
-            return {"role": "admin", "username": credentials.username}
-    return {"role": "public", "username": "visitor"}
+        user="root",
 
-# Create FastAPI app
-app = FastAPI(
-    title="Imperial AI Nexus - Humbulani Mudau",
-    description="Enterprise AI Chat Interface with Imperial Truth Integration",
-    version="3.0.0"
-)
+        password=_mysql_password(),
 
-# Add CORS middleware
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+        unix_socket="/data/data/com.termux/files/home/mysql_run/mysql.sock",
 
-# Mount static files
-app.mount("/static", StaticFiles(directory="static"), name="static")
+        database="imperial_nexus"
 
-# AI Agent Configuration
-AI_AGENT_URL = "https://ai.humbu.store/ai/proxy"  # Ollama endpoint
-TIMEOUT = 30.0
+    )
+from collections import defaultdict
+import uuid
+import threading
+import time
+import subprocess
+from fastapi import FastAPI, HTTPException, Header, Depends, Depends, Depends, Depends, Depends, Depends, Depends, Depends
+from fastapi.security import HTTPBasic, HTTPBasicCredentials
+from fastapi.responses import HTMLResponse
 
-# Imperial Truth endpoint
-@app.get("/api/imperial/truth")
-async def get_imperial_truth():
-    """Return current Imperial Truth metrics"""
-    return {
-        "valuation": 269905078380.45,
-        "lithium_trend": "BULLISH (+29.7%)",
-        "villages": 43,
-        "target": 900,
-        "status": "operational",
-        "timestamp": datetime.now().isoformat()
-    }
+app = FastAPI()
 
-# AI Chat endpoint (public)
-@app.post("/ai/chat")
-async def ai_chat(message_data: dict):
-    """Public AI chat endpoint"""
-    try:
-        ollama_payload = {
-            "model": "qwen2.5:1.5b",
-            "prompt": message_data.get("message", ""),
-            "stream": False
-        }
-        
-        async with httpx.AsyncClient(timeout=TIMEOUT) as client:
-            response = await client.post(
-                AI_AGENT_URL,
-                json=ollama_payload,
-                headers={"Content-Type": "application/json"}
-            )
-            
-            if response.status_code == 200:
-                ollama_response = response.json()
-                return {
-                    "response": ollama_response.get("response", ""),
-                    "model": ollama_response.get("model", "qwen:0.5b"),
-                    "timestamp": datetime.now().isoformat()
-                }
-            else:
-                return {
-                    "response": "Imperial AI is currently optimizing. Please try again.",
-                    "model": "fallback",
-                    "timestamp": datetime.now().isoformat()
-                }
-    except Exception as e:
-        return {
-            "response": "I'm here to assist with your enterprise queries.",
-            "error": str(e),
-            "timestamp": datetime.now().isoformat()
-        }
+def mysql_query(sql):
+    cmd = [
+        "mariadb",
+        "-u", "root",
+        "-p" + _mysql_password(),
+        "-S", "/data/data/com.termux/files/home/mysql_run/mysql.sock",
+        "imperial_nexus",
+        "-e", sql
+    ]
+    result = subprocess.run(cmd, capture_output=True, text=True, timeout=5)
+    if result.returncode != 0:
+        raise Exception(result.stderr.strip())
+    return result.stdout
 
-# Enhanced Imperial Chat with business context
-@app.post("/ai/imperial-chat")
-async def imperial_ai_chat(user_message: str):
-    """Enhanced AI chat with Imperial Truth context"""
-    try:
-        # Get imperial truth
-        imperial_context = await get_imperial_truth()
-        
-        sovereign_prompt = f"""You are the Imperial AI of Humbulani Mudau's enterprise.
-Current Imperial Truth:
-- Valuation: R{imperial_context['valuation']:,.2f}
-- Lithium Trend: {imperial_context['lithium_trend']}
-- Village Network: {imperial_context['villages']}/{imperial_context['target']} villages
-- Status: {imperial_context['status']}
-
-User Query: {user_message}
-
-Provide a helpful response as the Imperial AI assistant."""
-        
-        ollama_payload = {
-            "model": "qwen2.5:1.5b",
-            "prompt": sovereign_prompt,
-            "stream": False
-        }
-        
-        async with httpx.AsyncClient(timeout=TIMEOUT) as client:
-            response = await client.post(
-                AI_AGENT_URL,
-                json=ollama_payload,
-                headers={"Content-Type": "application/json"}
-            )
-            
-            if response.status_code == 200:
-                ai_response = response.json()
-                return {
-                    "ai_response": ai_response.get("response", ""),
-                    "business_context": imperial_context,
-                    "timestamp": datetime.now().isoformat()
-                }
-            else:
-                return {
-                    "ai_response": "Imperial AI systems are processing your request.",
-                    "business_context": imperial_context,
-                    "timestamp": datetime.now().isoformat()
-                }
-    except Exception as e:
-        return {
-            "ai_response": "I'm here to assist with your enterprise questions.",
-            "error": str(e),
-            "timestamp": datetime.now().isoformat()
-        }
-
-# Serve AI chat as homepage
-@app.get("/", response_class=HTMLResponse)
-async def serve_chat_interface(auth=Depends(optional_auth)):
-    """Serve the AI chat interface as the main page"""
-    try:
-        with open("public/ai-chat.html", "r") as f:
-            html_content = f.read()
-        return HTMLResponse(content=html_content)
-    except FileNotFoundError:
-        return HTMLResponse("""
-        <!DOCTYPE html>
-        <html>
-        <head><title>Imperial AI Nexus</title></head>
-        <body style="font-family: monospace; padding: 40px; background: #0d1117; color: white;">
-            <h1>🤖 Imperial AI Nexus</h1>
-            <p>Chat interface loading... Please refresh.</p>
-        </body>
-        </html>
-        """)
-
-# Health check endpoint
 @app.get("/health")
-async def health_check():
-    return {
-        "status": "healthy",
-        "service": "Imperial AI Nexus",
-        "version": "3.0.0",
-        "timestamp": datetime.now().isoformat()
-    }
+async def health():
+    return {"status": "ok"}
 
-# Legacy dashboard redirect
-@app.get("/dashboard")
-async def legacy_dashboard():
-    return HTMLResponse("""
+@app.get("/admin/usage")
+async def admin_usage(admin_key: str = Header(None, alias="X-Admin-Key"), payment_id: str = "unknown", fields: str = "basic"):
+    if admin_key != os.getenv("ADMIN_KEY"):
+        raise HTTPException(status_code=403, detail="Unauthorized")
+    
+    # Never store raw keys — store a short fingerprint
+    key_fingerprint = hashlib.sha256(admin_key.encode()).hexdigest()[:12] if admin_key else "none"
+
+    # Sanitize free-text (mysql_query runs `mariadb -e`, no bound params)
+    def _clean(s):
+        return "".join(ch for ch in str(s) if ch.isalnum() or ch in "_-.")[:64]
+
+    safe_payment_id = _clean(payment_id)
+    safe_fields = _clean(fields)
+
+    insert_sql = (
+        "INSERT INTO usage_logs (api_key, payment_id, fields) VALUES "
+        f"(\"{key_fingerprint}\", \"{safe_payment_id}\", \"{safe_fields}\")"
+    )
+    try:
+        mysql_query(insert_sql)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Insert error: {e}")
+    
+    select_sql = "SELECT timestamp, api_key, payment_id, fields FROM usage_logs"
+    try:
+        output = mysql_query(select_sql)
+        lines = output.strip().split("\n")
+        if len(lines) < 2:
+            entries = []
+        else:
+            header = lines[0].split("\t")
+            entries = [dict(zip(header, line.split("\t"))) for line in lines[1:]]
+        return {"total_requests": len(entries), "entries": entries}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Select error: {e}")
+
+@app.get("/")
+async def root():
+    from fastapi.responses import RedirectResponse
+    return RedirectResponse(url="/portal")
+
+
+# === Auth helpers for portal ===
+from fastapi.security import HTTPBasic, HTTPBasicCredentials
+import os as _os
+import hashlib
+def _mysql_password():
+    pwd = _os.environ.get("MYSQL_ROOT_PASSWORD", "")
+    if pwd:
+        return pwd
+    try:
+        with open(_os.path.expanduser("~/.my.cnf")) as f:
+            for line in f:
+                if line.startswith("password="):
+                    return line.split("=", 1)[1].strip()
+    except Exception:
+        pass
+    return ""
+
+security = HTTPBasic()
+
+def get_current_user(credentials: HTTPBasicCredentials = Depends(security)):
+    if credentials.username == os.getenv("PORTAL_USERNAME", "admin") and credentials.password == os.getenv("PORTAL_PASSWORD", "securepass"):
+        return credentials.username
+    raise HTTPException(status_code=401, detail="Invalid credentials")
+
+
+@app.get("/portal", response_class=HTMLResponse)
+async def portal(current_user: str = Depends(get_current_user)):
+    return """
     <!DOCTYPE html>
     <html>
-    <head><meta http-equiv="refresh" content="0; url=/" /></head>
-    <body>Redirecting to Imperial AI Chat...</body>
-    </html>
-    """)
-
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
-
-# Add this near the top with other imports if not already there
-import asyncio
-
-@app.post("/ai/proxy")
-async def render_ai_proxy(payload: dict):
-    """
-    Proxy endpoint on Render that forwards to your local AI through tunnel
-    This creates a reliable bridge between Render and your local AI
-    """
-    # Your tunnel URL
-    TUNNEL_URL = "https://ai.humbu.store/ai/proxy"
-    
-    for attempt in range(3):  # Retry up to 3 times
-        try:
-            async with httpx.AsyncClient(timeout=15.0) as client:
-                response = await client.post(
-                    TUNNEL_URL,
-                    json=payload,
-                    headers={"Content-Type": "application/json"}
-                )
-                
-                if response.status_code == 200:
-                    return response.json()
-                else:
-                    # Return a graceful error
-                    return {
-                        "response": "AI service is warming up. Please try again in a moment.",
-                        "status": "degraded",
-                        "attempt": attempt + 1
+    <head>
+        <title>Imperial Data Portal</title>
+        <style>
+            body { font-family: sans-serif; max-width: 700px; margin: 50px auto; padding: 20px; background: #f4f4f4; }
+            input, button { padding: 10px; width: 100%; margin: 8px 0; }
+            button { background: #2d7; border: none; color: white; font-weight: bold; cursor: pointer; }
+            #result { background: white; padding: 15px; border-radius: 5px; margin-top: 20px; white-space: pre-wrap; }
+            .nav { margin-bottom: 20px; }
+            .nav a { margin-right: 15px; }
+        </style>
+    </head>
+    <body>
+        <h2>🔐 Imperial Data Export</h2>
+        <p>Logged in as <strong>admin</strong></p>
+        <div class="nav">
+            <a href="/portal">Export</a> | <a href="/generate-download" onclick="return false;">Generate Download Link</a>
+        </div>
+        <form id="exportForm">
+            <input type="text" id="apiKey" placeholder="Your X-Export-Key" required>
+            <input type="text" id="paymentId" placeholder="Payment ID (e.g., tx_001)" required>
+            <select id="fields">
+                <option value="basic">Basic (tx_id, amount, date)</option>
+                <option value="full">Full (id, tx_id, amount, status, created_at)</option>
+            </select>
+            <button type="submit">Get Data</button>
+            <button type="button" id="downloadBtn" onclick="downloadData()">Download CSV</button>
+        </form>
+        <div id="result"></div>
+        <script>
+            async function callAPI(endpoint) {
+                const key = document.getElementById('apiKey').value;
+                const pid = document.getElementById('paymentId').value;
+                const fields = document.getElementById('fields').value;
+                const res = document.getElementById('result');
+                res.innerHTML = 'Loading...';
+                try {
+                    const response = await fetch(`/${endpoint}?payment_id=${pid}&fields=${fields}`, {
+                        headers: { 'X-Export-Key': key }
+                    });
+                    const data = await response.json();
+                    if (response.ok) {
+                        if (data.download_link) {
+                            res.innerHTML = `<p>Download link: <a href="${data.download_link}" target="_blank">${data.download_link}</a> (expires in ${data.expires_in})</p>`;
+                        } else {
+                            res.innerHTML = '<pre>' + JSON.stringify(data, null, 2) + '</pre>';
+                        }
+                    } else {
+                        res.innerHTML = '<b>Error:</b> ' + (data.detail || 'Unknown error');
                     }
-        except Exception as e:
-            if attempt == 2:  # Last attempt failed
-                return {
-                    "response": "Imperial AI is processing your request. The network is stable.",
-                    "error": str(e),
-                    "status": "fallback"
+                } catch (err) {
+                    res.innerHTML = '<b>Error:</b> ' + err.message;
                 }
-            await asyncio.sleep(1)  # Wait before retry
+            }
+            document.getElementById('exportForm').addEventListener('submit', (e) => {
+                e.preventDefault();
+                callAPI('export-data');
+            });
+            function downloadData() {
+                callAPI('generate-download');
+            }
+        </script>
+    </body>
+    </html>
+    """
 
-# Update the imperial-chat endpoint to use this proxy
-# Find the imperial_ai_chat function and replace its content with:
-"""
-    try:
-        # Call the proxy endpoint instead of directly calling the tunnel
-        async with httpx.AsyncClient(timeout=15.0) as client:
-            response = await client.post(
-                "https://fastapi-mobile-app.onrender.com/ai/proxy",  # Call itself
-                json={"prompt": user_message},
-                headers={"Content-Type": "application/json"}
-            )
-            
-            if response.status_code == 200:
-                data = response.json()
-                return {
-                    "ai_response": data.get("response", "Processing..."),
-                    "business_context": await get_imperial_truth(),
-                    "timestamp": datetime.now().isoformat()
+@app.get("/portal", response_class=HTMLResponse)
+async def portal(current_user: str = Depends(get_current_user)):
+    return """
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>Imperial Data Portal</title>
+        <style>
+            body { font-family: sans-serif; max-width: 700px; margin: 50px auto; padding: 20px; background: #f4f4f4; }
+            input, button { padding: 10px; width: 100%; margin: 8px 0; }
+            button { background: #2d7; border: none; color: white; font-weight: bold; cursor: pointer; }
+            #result { background: white; padding: 15px; border-radius: 5px; margin-top: 20px; white-space: pre-wrap; }
+            .nav { margin-bottom: 20px; }
+            .nav a { margin-right: 15px; }
+        </style>
+    </head>
+    <body>
+        <h2>🔐 Imperial Data Export</h2>
+        <p>Logged in as <strong>admin</strong></p>
+        <div class="nav">
+            <a href="/portal">Export</a> | <a href="/generate-download" onclick="return false;">Generate Download Link</a>
+        </div>
+        <form id="exportForm">
+            <input type="text" id="apiKey" placeholder="Your X-Export-Key" required>
+            <input type="text" id="paymentId" placeholder="Payment ID (e.g., tx_001)" required>
+            <select id="fields">
+                <option value="basic">Basic (tx_id, amount, date)</option>
+                <option value="full">Full (id, tx_id, amount, status, created_at)</option>
+            </select>
+            <button type="submit">Get Data</button>
+            <button type="button" id="downloadBtn" onclick="downloadData()">Download CSV</button>
+        </form>
+        <div id="result"></div>
+        <script>
+            async function callAPI(endpoint) {
+                const key = document.getElementById('apiKey').value;
+                const pid = document.getElementById('paymentId').value;
+                const fields = document.getElementById('fields').value;
+                const res = document.getElementById('result');
+                res.innerHTML = 'Loading...';
+                try {
+                    const response = await fetch(`/${endpoint}?payment_id=${pid}&fields=${fields}`, {
+                        headers: { 'X-Export-Key': key }
+                    });
+                    const data = await response.json();
+                    if (response.ok) {
+                        if (data.download_link) {
+                            res.innerHTML = `<p>Download link: <a href="${data.download_link}" target="_blank">${data.download_link}</a> (expires in ${data.expires_in})</p>`;
+                        } else {
+                            res.innerHTML = '<pre>' + JSON.stringify(data, null, 2) + '</pre>';
+                        }
+                    } else {
+                        res.innerHTML = '<b>Error:</b> ' + (data.detail || 'Unknown error');
+                    }
+                } catch (err) {
+                    res.innerHTML = '<b>Error:</b> ' + err.message;
                 }
+            }
+            document.getElementById('exportForm').addEventListener('submit', (e) => {
+                e.preventDefault();
+                callAPI('export-data');
+            });
+            function downloadData() {
+                callAPI('generate-download');
+            }
+        </script>
+    </body>
+    </html>
+    """
+
+async def dashboard_ui():
+    return """
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>Imperial Live Dashboard</title>
+        <meta http-equiv="refresh" content="10">
+        <style>
+            body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #0a0e17; color: #eee; padding: 20px; }
+            .card { background: #1a2332; border-radius: 12px; padding: 20px; margin: 10px; display: inline-block; min-width: 180px; border-left: 4px solid #00d4ff; }
+            .value { font-size: 28px; font-weight: bold; color: #00d4ff; }
+            .label { font-size: 14px; color: #8a9bb5; text-transform: uppercase; letter-spacing: 1px; }
+            .grid { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; max-width: 1200px; margin: 0 auto; }
+            .header { text-align: center; margin-bottom: 30px; }
+            .header h1 { color: #00d4ff; }
+            .header small { color: #8a9bb5; }
+        </style>
+    </head>
+    <body>
+        <div class="header">
+            <h1>🏛️ Imperial Network Dashboard</h1>
+            <small>Live metrics – auto‑refresh every 10 seconds</small>
+        </div>
+        <div id="dashboard" class="grid">Loading...</div>
+        <script>
+            async function fetchData() {
+                try {
+                    const res = await fetch('/dashboard-latest');
+                    const json = await res.json();
+                    if (!res.ok) {
+                        document.getElementById('dashboard').innerHTML = '<p style="color:red;">Error: ' + (json.detail || 'Unknown') + '</p>';
+                        return;
+                    }
+                    const data = json.data;
+                    if (!data) {
+                        document.getElementById('dashboard').innerHTML = '<p>No data yet.</p>';
+                        return;
+                    }
+                    const metrics = [
+                        { label: 'Valuation (ZAR)', value: data.valuation, fmt: v => Number(v).toLocaleString() },
+                        { label: 'Gold Price (R/g)', value: data.gold_price, fmt: v => v },
+                        { label: 'Wealth Gain', value: data.wealth_gain, fmt: v => Number(v).toLocaleString() },
+                        { label: 'Energy Flow ($/MWh)', value: data.energy_flow, fmt: v => v },
+                        { label: 'Grid Status', value: data.grid_status, fmt: v => v == 1 ? '✅ Online' : '❌ Offline' },
+                        { label: 'Progress (%)', value: data.progress, fmt: v => v + '%' },
+                        { label: 'Lithium Flow (t)', value: data.lithium_flow, fmt: v => v },
+                        { label: 'Beira Status (M tons)', value: data.beira_status, fmt: v => v },
+                        { label: 'Port Status', value: data.port_status, fmt: v => v == 1 ? '✅ Active' : '❌ Inactive' },
+                    ];
+                    let html = '';
+                    metrics.forEach(m => {
+                        const formatted = m.fmt ? m.fmt(m.value) : m.value;
+                        html += `<div class="card"><div class="label">${m.label}</div><div class="value">${formatted}</div></div>`;
+                    });
+                    document.getElementById('dashboard').innerHTML = html;
+                } catch (e) {
+                    document.getElementById('dashboard').innerHTML = '<p style="color:red;">Error: ' + e.message + '</p>';
+                }
+            }
+            fetchData();
+            setInterval(fetchData, 10000);
+        </script>
+    </body>
+    </html>
+    """
+
+@app.get("/dashboard-latest")
+async def dashboard_latest():
+    select_sql = "SELECT * FROM dashboard_metrics ORDER BY id DESC LIMIT 1"
+    try:
+        output = mysql_query(select_sql)
+        lines = output.strip().split("\n")
+        if len(lines) < 2:
+            return {"data": None}
+        header = lines[0].split("\t")
+        row = lines[1].split("\t")
+        data = dict(zip(header, row))
+        return {"data": data}
     except Exception as e:
-        return {
-            "ai_response": "Imperial systems are operating at full capacity.",
-            "error": str(e),
-            "timestamp": datetime.now().isoformat()
-        }
-"""
+        raise HTTPException(status_code=500, detail=f"DB query error: {e}")
+
+@app.get("/dashboard-ui", response_class=HTMLResponse)
+async def dashboard_ui():
+    return """
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>Imperial Live Dashboard</title>
+        <meta http-equiv="refresh" content="10">
+        <style>
+            body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #0a0e17; color: #eee; padding: 20px; }
+            .card { background: #1a2332; border-radius: 12px; padding: 20px; margin: 10px; display: inline-block; min-width: 180px; border-left: 4px solid #00d4ff; }
+            .value { font-size: 28px; font-weight: bold; color: #00d4ff; }
+            .label { font-size: 14px; color: #8a9bb5; text-transform: uppercase; letter-spacing: 1px; }
+            .grid { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; max-width: 1200px; margin: 0 auto; }
+            .header { text-align: center; margin-bottom: 30px; }
+            .header h1 { color: #00d4ff; }
+            .header small { color: #8a9bb5; }
+        </style>
+    </head>
+    <body>
+        <div class="header">
+            <h1>🏛️ Imperial Network Dashboard</h1>
+            <small>Live metrics – auto‑refresh every 10 seconds</small>
+        </div>
+        <div id="dashboard" class="grid">Loading...</div>
+        <script>
+            async function fetchData() {
+                try {
+                    const res = await fetch('/dashboard-latest');
+                    const json = await res.json();
+                    if (!res.ok) {
+                        document.getElementById('dashboard').innerHTML = '<p style="color:red;">Error: ' + (json.detail || 'Unknown') + '</p>';
+                        return;
+                    }
+                    const data = json.data;
+                    if (!data) {
+                        document.getElementById('dashboard').innerHTML = '<p>No data yet.</p>';
+                        return;
+                    }
+                    const metrics = [
+                        { label: 'Valuation (ZAR)', value: data.valuation, fmt: v => Number(v).toLocaleString() },
+                        { label: 'Gold Price (R/g)', value: data.gold_price, fmt: v => v },
+                        { label: 'Wealth Gain', value: data.wealth_gain, fmt: v => Number(v).toLocaleString() },
+                        { label: 'Energy Flow ($/MWh)', value: data.energy_flow, fmt: v => v },
+                        { label: 'Grid Status', value: data.grid_status, fmt: v => v == 1 ? '✅ Online' : '❌ Offline' },
+                        { label: 'Progress (%)', value: data.progress, fmt: v => v + '%' },
+                        { label: 'Lithium Flow (t)', value: data.lithium_flow, fmt: v => v },
+                        { label: 'Beira Status (M tons)', value: data.beira_status, fmt: v => v },
+                        { label: 'Port Status', value: data.port_status, fmt: v => v == 1 ? '✅ Active' : '❌ Inactive' },
+                    ];
+                    let html = '';
+                    metrics.forEach(m => {
+                        const formatted = m.fmt ? m.fmt(m.value) : m.value;
+                        html += `<div class="card"><div class="label">${m.label}</div><div class="value">${formatted}</div></div>`;
+                    });
+                    document.getElementById('dashboard').innerHTML = html;
+                } catch (e) {
+                    document.getElementById('dashboard').innerHTML = '<p style="color:red;">Error: ' + e.message + '</p>';
+                }
+            }
+            fetchData();
+            setInterval(fetchData, 10000);
+        </script>
+    </body>
+    </html>
+    """
+
+@app.get("/portal", response_class=HTMLResponse)
+async def portal(current_user: str = Depends(get_current_user)):
+    return """
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>Imperial Data Portal</title>
+        <style>
+            body { font-family: sans-serif; max-width: 700px; margin: 50px auto; padding: 20px; background: #f4f4f4; }
+            input, button { padding: 10px; width: 100%; margin: 8px 0; }
+            button { background: #2d7; border: none; color: white; font-weight: bold; cursor: pointer; }
+            #result { background: white; padding: 15px; border-radius: 5px; margin-top: 20px; white-space: pre-wrap; }
+            .nav { margin-bottom: 20px; }
+            .nav a { margin-right: 15px; }
+        </style>
+    </head>
+    <body>
+        <h2>🔐 Imperial Data Export</h2>
+        <p>Logged in as <strong>admin</strong></p>
+        <div class="nav">
+            <a href="/portal">Export</a> | <a href="/generate-download" onclick="return false;">Generate Download Link</a>
+        </div>
+        <form id="exportForm">
+            <input type="text" id="apiKey" placeholder="Your X-Export-Key" required>
+            <input type="text" id="paymentId" placeholder="Payment ID (e.g., tx_001)" required>
+            <select id="fields">
+                <option value="basic">Basic (tx_id, amount, date)</option>
+                <option value="full">Full (id, tx_id, amount, status, created_at)</option>
+            </select>
+            <button type="submit">Get Data</button>
+            <button type="button" id="downloadBtn" onclick="downloadData()">Download CSV</button>
+        </form>
+        <div id="result"></div>
+        <script>
+            async function callAPI(endpoint) {
+                const key = document.getElementById('apiKey').value;
+                const pid = document.getElementById('paymentId').value;
+                const fields = document.getElementById('fields').value;
+                const res = document.getElementById('result');
+                res.innerHTML = 'Loading...';
+                try {
+                    const response = await fetch(`/${endpoint}?payment_id=${pid}&fields=${fields}`, {
+                        headers: { 'X-Export-Key': key }
+                    });
+                    const data = await response.json();
+                    if (response.ok) {
+                        if (data.download_link) {
+                            res.innerHTML = `<p>Download link: <a href="${data.download_link}" target="_blank">${data.download_link}</a> (expires in ${data.expires_in})</p>`;
+                        } else {
+                            res.innerHTML = '<pre>' + JSON.stringify(data, null, 2) + '</pre>';
+                        }
+                    } else {
+                        res.innerHTML = '<b>Error:</b> ' + (data.detail || 'Unknown error');
+                    }
+                } catch (err) {
+                    res.innerHTML = '<b>Error:</b> ' + err.message;
+                }
+            }
+            document.getElementById('exportForm').addEventListener('submit', (e) => {
+                e.preventDefault();
+                callAPI('export-data');
+            });
+            function downloadData() {
+                callAPI('generate-download');
+            }
+        </script>
+    </body>
+    </html>
+    """
+
+@app.get("/portal", response_class=HTMLResponse)
+async def portal(current_user: str = Depends(get_current_user)):
+    return """
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>Imperial Data Portal</title>
+        <style>
+            body { font-family: sans-serif; max-width: 700px; margin: 50px auto; padding: 20px; background: #f4f4f4; }
+            input, button { padding: 10px; width: 100%; margin: 8px 0; }
+            button { background: #2d7; border: none; color: white; font-weight: bold; cursor: pointer; }
+            #result { background: white; padding: 15px; border-radius: 5px; margin-top: 20px; white-space: pre-wrap; }
+            .nav { margin-bottom: 20px; }
+            .nav a { margin-right: 15px; }
+        </style>
+    </head>
+    <body>
+        <h2>🔐 Imperial Data Export</h2>
+        <p>Logged in as <strong>admin</strong></p>
+        <div class="nav">
+            <a href="/portal">Export</a> | <a href="/generate-download" onclick="return false;">Generate Download Link</a>
+        </div>
+        <form id="exportForm">
+            <input type="text" id="apiKey" placeholder="Your X-Export-Key" required>
+            <input type="text" id="paymentId" placeholder="Payment ID (e.g., tx_001)" required>
+            <select id="fields">
+                <option value="basic">Basic (tx_id, amount, date)</option>
+                <option value="full">Full (id, tx_id, amount, status, created_at)</option>
+            </select>
+            <button type="submit">Get Data</button>
+            <button type="button" id="downloadBtn" onclick="downloadData()">Download CSV</button>
+        </form>
+        <div id="result"></div>
+        <script>
+            async function callAPI(endpoint) {
+                const key = document.getElementById('apiKey').value;
+                const pid = document.getElementById('paymentId').value;
+                const fields = document.getElementById('fields').value;
+                const res = document.getElementById('result');
+                res.innerHTML = 'Loading...';
+                try {
+                    const response = await fetch(`/${endpoint}?payment_id=${pid}&fields=${fields}`, {
+                        headers: { 'X-Export-Key': key }
+                    });
+                    const data = await response.json();
+                    if (response.ok) {
+                        if (data.download_link) {
+                            res.innerHTML = `<p>Download link: <a href="${data.download_link}" target="_blank">${data.download_link}</a> (expires in ${data.expires_in})</p>`;
+                        } else {
+                            res.innerHTML = '<pre>' + JSON.stringify(data, null, 2) + '</pre>';
+                        }
+                    } else {
+                        res.innerHTML = '<b>Error:</b> ' + (data.detail || 'Unknown error');
+                    }
+                } catch (err) {
+                    res.innerHTML = '<b>Error:</b> ' + err.message;
+                }
+            }
+            document.getElementById('exportForm').addEventListener('submit', (e) => {
+                e.preventDefault();
+                callAPI('export-data');
+            });
+            function downloadData() {
+                callAPI('generate-download');
+            }
+        </script>
+    </body>
+    </html>
+    """
+
+@app.get("/portal", response_class=HTMLResponse)
+async def portal(current_user: str = Depends(get_current_user)):
+    return """
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>Imperial Data Portal</title>
+        <style>
+            body { font-family: sans-serif; max-width: 700px; margin: 50px auto; padding: 20px; background: #f4f4f4; }
+            input, button { padding: 10px; width: 100%; margin: 8px 0; }
+            button { background: #2d7; border: none; color: white; font-weight: bold; cursor: pointer; }
+            #result { background: white; padding: 15px; border-radius: 5px; margin-top: 20px; white-space: pre-wrap; }
+            .nav { margin-bottom: 20px; }
+            .nav a { margin-right: 15px; }
+        </style>
+    </head>
+    <body>
+        <h2>🔐 Imperial Data Export</h2>
+        <p>Logged in as <strong>admin</strong></p>
+        <div class="nav">
+            <a href="/portal">Export</a> | <a href="/generate-download" onclick="return false;">Generate Download Link</a>
+        </div>
+        <form id="exportForm">
+            <input type="text" id="apiKey" placeholder="Your X-Export-Key" required>
+            <input type="text" id="paymentId" placeholder="Payment ID (e.g., tx_001)" required>
+            <select id="fields">
+                <option value="basic">Basic (tx_id, amount, date)</option>
+                <option value="full">Full (id, tx_id, amount, status, created_at)</option>
+            </select>
+            <button type="submit">Get Data</button>
+            <button type="button" id="downloadBtn" onclick="downloadData()">Download CSV</button>
+        </form>
+        <div id="result"></div>
+        <script>
+            async function callAPI(endpoint) {
+                const key = document.getElementById('apiKey').value;
+                const pid = document.getElementById('paymentId').value;
+                const fields = document.getElementById('fields').value;
+                const res = document.getElementById('result');
+                res.innerHTML = 'Loading...';
+                try {
+                    const response = await fetch(`/${endpoint}?payment_id=${pid}&fields=${fields}`, {
+                        headers: { 'X-Export-Key': key }
+                    });
+                    const data = await response.json();
+                    if (response.ok) {
+                        if (data.download_link) {
+                            res.innerHTML = `<p>Download link: <a href="${data.download_link}" target="_blank">${data.download_link}</a> (expires in ${data.expires_in})</p>`;
+                        } else {
+                            res.innerHTML = '<pre>' + JSON.stringify(data, null, 2) + '</pre>';
+                        }
+                    } else {
+                        res.innerHTML = '<b>Error:</b> ' + (data.detail || 'Unknown error');
+                    }
+                } catch (err) {
+                    res.innerHTML = '<b>Error:</b> ' + err.message;
+                }
+            }
+            document.getElementById('exportForm').addEventListener('submit', (e) => {
+                e.preventDefault();
+                callAPI('export-data');
+            });
+            function downloadData() {
+                callAPI('generate-download');
+            }
+        </script>
+    </body>
+    </html>
+    """
+
+@app.get("/portal", response_class=HTMLResponse)
+async def portal(current_user: str = Depends(get_current_user)):
+    return """
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>Imperial Data Portal</title>
+        <style>
+            body { font-family: sans-serif; max-width: 700px; margin: 50px auto; padding: 20px; background: #f4f4f4; }
+            input, button { padding: 10px; width: 100%; margin: 8px 0; }
+            button { background: #2d7; border: none; color: white; font-weight: bold; cursor: pointer; }
+            #result { background: white; padding: 15px; border-radius: 5px; margin-top: 20px; white-space: pre-wrap; }
+            .nav { margin-bottom: 20px; }
+            .nav a { margin-right: 15px; }
+        </style>
+    </head>
+    <body>
+        <h2>🔐 Imperial Data Export</h2>
+        <p>Logged in as <strong>admin</strong></p>
+        <div class="nav">
+            <a href="/portal">Export</a> | <a href="/generate-download" onclick="return false;">Generate Download Link</a>
+        </div>
+        <form id="exportForm">
+            <input type="text" id="apiKey" placeholder="Your X-Export-Key" required>
+            <input type="text" id="paymentId" placeholder="Payment ID (e.g., tx_001)" required>
+            <select id="fields">
+                <option value="basic">Basic (tx_id, amount, date)</option>
+                <option value="full">Full (id, tx_id, amount, status, created_at)</option>
+            </select>
+            <button type="submit">Get Data</button>
+            <button type="button" id="downloadBtn" onclick="downloadData()">Download CSV</button>
+        </form>
+        <div id="result"></div>
+        <script>
+            async function callAPI(endpoint) {
+                const key = document.getElementById('apiKey').value;
+                const pid = document.getElementById('paymentId').value;
+                const fields = document.getElementById('fields').value;
+                const res = document.getElementById('result');
+                res.innerHTML = 'Loading...';
+                try {
+                    const response = await fetch(`/${endpoint}?payment_id=${pid}&fields=${fields}`, {
+                        headers: { 'X-Export-Key': key }
+                    });
+                    const data = await response.json();
+                    if (response.ok) {
+                        if (data.download_link) {
+                            res.innerHTML = `<p>Download link: <a href="${data.download_link}" target="_blank">${data.download_link}</a> (expires in ${data.expires_in})</p>`;
+                        } else {
+                            res.innerHTML = '<pre>' + JSON.stringify(data, null, 2) + '</pre>';
+                        }
+                    } else {
+                        res.innerHTML = '<b>Error:</b> ' + (data.detail || 'Unknown error');
+                    }
+                } catch (err) {
+                    res.innerHTML = '<b>Error:</b> ' + err.message;
+                }
+            }
+            document.getElementById('exportForm').addEventListener('submit', (e) => {
+                e.preventDefault();
+                callAPI('export-data');
+            });
+            function downloadData() {
+                callAPI('generate-download');
+            }
+        </script>
+    </body>
+    </html>
+    """
+
+@app.get("/portal", response_class=HTMLResponse)
+async def portal(current_user: str = Depends(get_current_user)):
+    return """
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>Imperial Data Portal</title>
+        <style>
+            body { font-family: sans-serif; max-width: 700px; margin: 50px auto; padding: 20px; background: #f4f4f4; }
+            input, button { padding: 10px; width: 100%; margin: 8px 0; }
+            button { background: #2d7; border: none; color: white; font-weight: bold; cursor: pointer; }
+            #result { background: white; padding: 15px; border-radius: 5px; margin-top: 20px; white-space: pre-wrap; }
+            .nav { margin-bottom: 20px; }
+            .nav a { margin-right: 15px; }
+        </style>
+    </head>
+    <body>
+        <h2>🔐 Imperial Data Export</h2>
+        <p>Logged in as <strong>admin</strong></p>
+        <div class="nav">
+            <a href="/portal">Export</a> | <a href="/generate-download" onclick="return false;">Generate Download Link</a>
+        </div>
+        <form id="exportForm">
+            <input type="text" id="apiKey" placeholder="Your X-Export-Key" required>
+            <input type="text" id="paymentId" placeholder="Payment ID (e.g., tx_001)" required>
+            <select id="fields">
+                <option value="basic">Basic (tx_id, amount, date)</option>
+                <option value="full">Full (id, tx_id, amount, status, created_at)</option>
+            </select>
+            <button type="submit">Get Data</button>
+            <button type="button" id="downloadBtn" onclick="downloadData()">Download CSV</button>
+        </form>
+        <div id="result"></div>
+        <script>
+            async function callAPI(endpoint) {
+                const key = document.getElementById('apiKey').value;
+                const pid = document.getElementById('paymentId').value;
+                const fields = document.getElementById('fields').value;
+                const res = document.getElementById('result');
+                res.innerHTML = 'Loading...';
+                try {
+                    const response = await fetch(`/${endpoint}?payment_id=${pid}&fields=${fields}`, {
+                        headers: { 'X-Export-Key': key }
+                    });
+                    const data = await response.json();
+                    if (response.ok) {
+                        if (data.download_link) {
+                            res.innerHTML = `<p>Download link: <a href="${data.download_link}" target="_blank">${data.download_link}</a> (expires in ${data.expires_in})</p>`;
+                        } else {
+                            res.innerHTML = '<pre>' + JSON.stringify(data, null, 2) + '</pre>';
+                        }
+                    } else {
+                        res.innerHTML = '<b>Error:</b> ' + (data.detail || 'Unknown error');
+                    }
+                } catch (err) {
+                    res.innerHTML = '<b>Error:</b> ' + err.message;
+                }
+            }
+            document.getElementById('exportForm').addEventListener('submit', (e) => {
+                e.preventDefault();
+                callAPI('export-data');
+            });
+            function downloadData() {
+                callAPI('generate-download');
+            }
+        </script>
+    </body>
+    </html>
+    """
+def is_valid_export_key(key):
+    if not os.path.exists(KEY_FILE):
+        return False
+    with open(KEY_FILE) as f:
+        for line in f:
+            if ":" not in line:
+                continue
+            _, stored_key = line.strip().split(":", 1)
+            if stored_key == key:
+                return True
+    return False
+
+def generate_download_file(data, payment_id):
+    if not data:
+        return None
+    filename = f"{payment_id}_{uuid.uuid4().hex[:8]}.csv"
+    filepath = os.path.join(DOWNLOAD_DIR, filename)
+    header = data[0].keys()
+    with open(filepath, 'w') as f:
+        f.write(','.join(header) + '\n')
+        for row in data:
+            f.write(','.join(str(row.get(k, '')) for k in header) + '\n')
+    return filepath, filename
+
+@app.get("/download/{filename}")
+async def download_file(filename: str):
+    filepath = os.path.join(DOWNLOAD_DIR, filename)
+    if not os.path.exists(filepath):
+        raise HTTPException(status_code=404, detail="File not found or expired")
+    response = FileResponse(filepath, media_type='text/csv', filename=filename)
+    async def remove_file():
+        if os.path.exists(filepath):
+            os.remove(filepath)
+    response.background = remove_file
+    return response
+
+# === 4. Portal with authentication ===
+@app.get("/export-data")
+async def export_data(payment_id: str, fields: str = "basic", x_export_key: str = Header(None)):
+    if not x_export_key or not is_valid_export_key(x_export_key):
+        raise HTTPException(status_code=403, detail="Invalid or missing export key")
+    if is_rate_limited(x_export_key):
+        raise HTTPException(status_code=429, detail="Rate limit exceeded")
+    with open(os.path.expanduser("~/imperial_network/usage.log"), "a") as f:
+        f.write(f"{time.ctime()}|{x_export_key}|{payment_id}|{fields}\n")
+    check_sql = f"SELECT status FROM transactions WHERE tx_id='{payment_id}' LIMIT 1"
+    try:
+        output = mysql_query(check_sql)
+        if "success" not in output:
+            raise HTTPException(status_code=402, detail="Payment Required or Invalid ID")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"DB error: {e}")
+    columns = "id, tx_id, amount, status, created_at" if fields == "full" else "tx_id, amount, DATE(created_at) as date"
+    export_sql = f"SELECT {columns} FROM transactions WHERE status='success'"
+    try:
+        output = mysql_query(export_sql)
+        lines = output.strip().split('\n')
+        if len(lines) < 2:
+            data = []
+        else:
+            header = lines[0].split('\t')
+            rows = [dict(zip(header, line.split('\t'))) for line in lines[1:]]
+            data = rows
+        return {"data": data}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Export error: {e}")
+
+# === 3. Generate download link ===
+@app.get("/generate-download")
+async def generate_download(payment_id: str, fields: str = "basic", x_export_key: str = Header(None)):
+    if not x_export_key or not is_valid_export_key(x_export_key):
+        raise HTTPException(status_code=403, detail="Invalid or missing export key")
+    if is_rate_limited(x_export_key):
+        raise HTTPException(status_code=429, detail="Rate limit exceeded")
+    with open(os.path.expanduser("~/imperial_network/usage.log"), "a") as f:
+        f.write(f"{time.ctime()}|{x_export_key}|{payment_id}|download|{fields}\n")
+    check_sql = f"SELECT status FROM transactions WHERE tx_id='{payment_id}' LIMIT 1"
+    try:
+        output = mysql_query(check_sql)
+        if "success" not in output:
+            raise HTTPException(status_code=402, detail="Payment Required or Invalid ID")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"DB error: {e}")
+    columns = "id, tx_id, amount, status, created_at" if fields == "full" else "tx_id, amount, DATE(created_at) as date"
+    export_sql = f"SELECT {columns} FROM transactions WHERE status='success'"
+    try:
+        output = mysql_query(export_sql)
+        lines = output.strip().split('\n')
+        if len(lines) < 2:
+            data = []
+        else:
+            header = lines[0].split('\t')
+            rows = [dict(zip(header, line.split('\t'))) for line in lines[1:]]
+            data = rows
+        if not data:
+            raise HTTPException(status_code=404, detail="No data available")
+        filepath, filename = generate_download_file(data, payment_id)
+        if not filepath:
+            raise HTTPException(status_code=500, detail="Could not generate file")
+        link = f"/download/{filename}"
+        return {"download_link": link, "expires_in": "5 minutes"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Export error: {e}")
+
+@app.post("/yoco-webhook")
+async def yoco_webhook(request: Request):
+    token = request.query_params.get("token")
+    if token != WEBHOOK_SECRET:
+        raise HTTPException(status_code=403, detail="Unauthorized")
+    try:
+        data = await request.json()
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid JSON")
+    tx_id = data.get("id")
+    amount = data.get("amount")
+    status = data.get("status")
+    if None in (tx_id, amount, status):
+        raise HTTPException(status_code=400, detail="Missing fields")
+    sql = f"INSERT INTO transactions (tx_id, amount, status) VALUES ('{tx_id}', {amount}, '{status}')"
+    try:
+        mysql_query(sql)
+        return {"status": "success", "message": "Transaction recorded"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"DB error: {e}")
+
+# === 2. Export (customisable fields) ===
+@app.get("/admin/transactions")
+async def admin_transactions(admin_key: str = Header(None, alias="X-Admin-Key"), status: str = None):
+    if admin_key != os.getenv("ADMIN_KEY"):
+        raise HTTPException(status_code=403, detail="Unauthorized")
+    
+    conn = get_db_connection()
+    cursor = conn.cursor(dictionary=True)
+    if status:
+        cursor.execute("SELECT * FROM transactions WHERE status = %s ORDER BY id DESC LIMIT 5", (status,))
+    else:
+        cursor.execute("SELECT * FROM transactions ORDER BY id DESC LIMIT 5")
+    entries = cursor.fetchall()
+    cursor.close()
+    conn.close()
+    
+    return {"transactions": entries}
+
+async def root():
+    return RedirectResponse(url="/portal")
+
+# === 10. Health ===
+@app.get("/admin/metrics")
+async def admin_metrics(admin_key: str = Header(None, alias="X-Admin-Key")):
+    if admin_key != os.getenv("ADMIN_KEY"):
+        raise HTTPException(status_code=403, detail="Unauthorized")
+    
+    conn = get_db_connection()
+    cursor = conn.cursor(dictionary=True)
+    cursor.execute("SELECT * FROM dashboard_metrics ORDER BY id DESC LIMIT 5")
+    entries = cursor.fetchall()
+    cursor.close()
+    conn.close()
+    
+    return {"metrics": entries}
+
+WEBHOOK_SECRET = os.getenv("WEBHOOK_SECRET", "E5rbHUSBx63397yO7lV1yApPfZKCyIV")
+KEY_FILE = os.path.expanduser("~/imperial_network/api_keys.db")
+ADMIN_KEY = os.getenv("ADMIN_KEY", "")  # no fallback — must be set in .env
+RATE_LIMIT = 10
+RATE_WINDOW = 60
+PORTAL_USERNAME = os.getenv("PORTAL_USERNAME", "admin")
+PORTAL_PASSWORD = os.getenv("PORTAL_PASSWORD", "securepass")
+DOWNLOAD_DIR = os.path.expanduser("~/imperial_network/downloads")
+
+def is_rate_limited(key):
+    now = time.time()
+    rate_store[key] = [t for t in rate_store[key] if now - t < RATE_WINDOW]
+    if len(rate_store[key]) >= RATE_LIMIT:
+        return True
+    rate_store[key].append(now)
+    return False
+
+def cleanup_downloads():
+    now = time.time()
+    for f in os.listdir(DOWNLOAD_DIR):
+        fp = os.path.join(DOWNLOAD_DIR, f)
+        if os.path.isfile(fp) and (now - os.path.getmtime(fp)) > 3600:
+            os.remove(fp)
+    threading.Timer(3600, cleanup_downloads).start()
+cleanup_downloads()
+rate_store = defaultdict(list)
+
+# --- Community Safety Feed (restored) ---
+import pymysql
+
+@app.get("/community-safety-feed")
+async def community_safety_feed():
+    try:
+        conn = pymysql.connect(
+            unix_socket="/data/data/com.termux/files/home/mysql_run/mysql.sock",
+            user="root",
+            password=_mysql_password(),
+            database="imperial_nexus",
+            autocommit=True
+        )
+        cur = conn.cursor()
+        cur.execute("SELECT id, incident_type, location_id, severity_level, is_verified, action_taken, created_at FROM community_incidents ORDER BY created_at DESC")
+        rows = cur.fetchall()
+        cur.close()
+        conn.close()
+        incidents = []
+        for row in rows:
+            incidents.append({
+                "id": str(row[0]),
+                "incident_type": row[1],
+                "location_id": str(row[2]) if row[2] else None,
+                "severity_level": str(row[3]),
+                "is_verified": str(row[4]) if row[4] is not None else "0",
+                "action_taken": row[5],
+                "created_at": row[6].strftime("%Y-%m-%d %H:%M:%S") if row[6] else None
+            })
+        return {"incidents": incidents}
+    except Exception as e:
+        return {"incidents": [], "error": str(e)}
+
+# ==========================================
+# NEW IMPERIAL API FEATURES
+# ==========================================
+import os
+import json
+from pathlib import Path
+import pymysql
+
+# 1. Wealth API
+@app.get("/api/wealth")
+def get_wealth():
+    # Look for the wealth file in current or parent directory
+    paths = [Path("wealth_lock.json"), Path("../wealth_lock.json"), Path("../imperial_wealth_dashboard.json")]
+    for p in paths:
+        if p.exists():
+            with open(p, "r") as f:
+                return {"status": "success", "source": str(p), "data": json.load(f)}
+    return {"status": "error", "message": "Wealth data not found"}
+
+# 2. Vulnerability Feed (MariaDB)
+@app.get("/api/vulnerabilities")
+def get_vulnerabilities():
+    socket_path = '/data/data/com.termux/files/home/mysql_run/mysql.sock'
+    if not os.path.exists(socket_path):
+        return {"status": "warning", "message": "MariaDB is only accessible when running on Termux locally."}
+    try:
+        connection = pymysql.connect(
+            unix_socket=socket_path,
+            user='root',
+            password=os.getenv('DB_PASSWORD', 'RootStrongPass123!'),
+            database='imperial_nexus',
+            cursorclass=pymysql.cursors.DictCursor
+        )
+        with connection.cursor() as cursor:
+            cursor.execute("SELECT id, vulnerability_type, severity, target_port, logged_at, notified FROM vulnerability_logs ORDER BY logged_at DESC LIMIT 50")
+            result = cursor.fetchall()
+        connection.close()
+        return {"status": "success", "count": len(result), "data": result}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+# 3. Imperial Health Check (system_status.md)
+@app.get("/api/system-status")
+def get_system_status():
+    p = Path("../system_status.md")
+    if p.exists():
+        with open(p, "r") as f:
+            content = f.read()
+        return {"status": "success", "markdown": content}
+    return {"status": "error", "message": "system_status.md not found"}
