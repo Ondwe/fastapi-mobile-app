@@ -1017,7 +1017,7 @@ def get_vulnerabilities():
 # 3. Imperial Health Check (system_status.md)
 @app.get("/api/system-status")
 def get_system_status():
-    p = Path("../system_status.md")
+    p = Path("system_status.md") if Path("system_status.md").exists() else Path("../system_status.md")
     if p.exists():
         with open(p, "r") as f:
             content = f.read()
