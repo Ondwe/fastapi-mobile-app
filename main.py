@@ -1018,9 +1018,20 @@ def get_vulnerabilities():
 @app.get("/api/system-status")
 def get_system_status():
     import urllib.request
+    import json
+    import os
+    
+    token = os.getenv("GITHUB_TOKEN")
+    if not token:
+        return {"status": "error", "message": "GITHUB_TOKEN environment variable is not set in Render."}
+        
+    url = "https://api.github.com/repos/Humbulan/Humbulan/contents/system_status.md"
+    req = urllib.request.Request(url)
+    req.add_header("Authorization", f"token {token}")
+    req.add_header("Accept", "application/vnd.github.v3.raw")
+    
     try:
-        url = "https://raw.githubusercontent.com/Humbulan/Humbulan/main/system_status.md"
-        with urllib.request.urlopen(url) as response:
+        with urllib.request.urlopen(req) as response:
             content = response.read().decode('utf-8')
         return {"status": "success", "markdown": content}
     except Exception as e:
