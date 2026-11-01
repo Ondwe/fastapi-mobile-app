@@ -1017,9 +1017,12 @@ def get_vulnerabilities():
 # 3. Imperial Health Check (system_status.md)
 @app.get("/api/system-status")
 def get_system_status():
-    p = Path("system_status.md") if Path("system_status.md").exists() else Path("../system_status.md")
-    if p.exists():
-        with open(p, "r") as f:
-            content = f.read()
+    import urllib.request
+    try:
+        url = "https://raw.githubusercontent.com/Humbulan/Humbulan/main/system_status.md"
+        with urllib.request.urlopen(url) as response:
+            content = response.read().decode('utf-8')
         return {"status": "success", "markdown": content}
-    return {"status": "error", "message": "system_status.md not found"}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
