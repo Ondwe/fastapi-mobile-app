@@ -931,6 +931,7 @@ def is_rate_limited(key):
 
 def cleanup_downloads():
     now = time.time()
+    os.makedirs(DOWNLOAD_DIR, exist_ok=True)
     for f in os.listdir(DOWNLOAD_DIR):
         fp = os.path.join(DOWNLOAD_DIR, f)
         if os.path.isfile(fp) and (now - os.path.getmtime(fp)) > 3600:
