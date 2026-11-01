@@ -1,0 +1,40 @@
+{
+  "timestamp": "2026-02-25",
+  "base_valuation": 1568116092.14,
+  "market_gain": 238050000.0,
+  "true_valuation": 1806166092.14,
+  "gain_percentage": 15.18,
+  "status": "SECURED",
+  "verified_by": "GLM-5 Cloud",
+  "protection_level": "ABSOLUTE TRUTH",
+  "next_rebase": "2026-03-25",
+  "sectors": {
+    "lithium": {
+      "price_usd": 3250,
+      "growth": 29.7,
+      "contribution": 66639999.99
+    },
+    "gold": {
+      "price_zar_oz": 82500,
+      "monthly_export_m": 150.8,
+      "contribution": 150800000.0
+    },
+    "energy": {
+      "gwh": 425,
+      "flow_m": 68.7,
+      "contribution": 20610000.0
+    }
+  },
+  "assets": [
+    {
+      "type": "MTN Ghana Shares",
+      "shares": 883321,
+      "purchase_price": 5.78,
+      "value_ghs": 5105598.39,
+      "purchase_date": "2026-03-04",
+      "dividend_rate": 0.4,
+      "projected_dividend": 353328.4
+    }
+  ],
+  "gain": 2297519.2755
+}
