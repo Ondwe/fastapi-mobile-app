@@ -20,9 +20,9 @@ import uuid
 import threading
 import time
 import subprocess
-from fastapi import FastAPI, HTTPException, Header, Depends, Depends, Depends, Depends, Depends, Depends, Depends, Depends
+from fastapi import FastAPI, HTTPException, Header, Depends
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, FileResponse, RedirectResponse
 
 app = FastAPI()
 
@@ -980,6 +980,11 @@ import os
 import json
 from pathlib import Path
 import pymysql
+
+# 0. Version API
+@app.get("/api/version")
+async def get_version():
+    return {"app_version": "3.0.0", "status": "Imperial AI Nexus"}
 
 # 1. Wealth API
 @app.get("/api/wealth")
